@@ -380,6 +380,8 @@ var tests = []*components.IntegrationTest{
 	staging.StageHunks,
 	staging.StageLines,
 	staging.StageRanges,
+	staging.StageSomeLinesOfConsecutiveChanges,
+	staging.StageSomeNonMatchingLinesOfConsecutiveChanges,
 	stash.Apply,
 	stash.ApplyPatch,
 	stash.CreateBranch,
