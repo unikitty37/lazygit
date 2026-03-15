@@ -125,6 +125,17 @@ func (self *patchTransformer) transformHunk(hunk *Hunk, startOffset int, firstLi
 func (self *patchTransformer) transformHunkLines(hunk *Hunk, firstLineIdx int) []*PatchLine {
 	skippedNewlineMessageIndex := -1
 	newLines := []*PatchLine{}
+	// Unselected "old-file" lines (deletions when staging, additions when
+	// reverse-staging) are converted to context but buffered here rather than
+	// appended immediately. This ensures they end up after any selected additions
+	// in the same change block, giving the correct output ordering:
+	//   [selected deletions] [selected additions] [context from unselected deletions]
+	pendingContext := []*PatchLine{}
+
+	flushPendingContext := func() {
+		newLines = append(newLines, pendingContext...)
+		pendingContext = pendingContext[:0]
+	}
 
 	for i, line := range hunk.bodyLines {
 		lineIdx := i + firstLineIdx + 1 // plus one for header line
@@ -133,14 +144,36 @@ func (self *patchTransformer) transformHunkLines(hunk *Hunk, firstLineIdx int) [
 		}
 		isLineSelected := lo.Contains(self.opts.IncludedLineIndices, lineIdx)
 
-		if isLineSelected || (line.Kind == NEWLINE_MESSAGE && skippedNewlineMessageIndex != lineIdx) || line.Kind == CONTEXT {
+		if line.Kind == CONTEXT {
+			flushPendingContext()
 			newLines = append(newLines, line)
 			continue
 		}
 
-		if (line.Kind == DELETION && !self.opts.Reverse) || (line.Kind == ADDITION && self.opts.Reverse) {
+		if line.Kind == NEWLINE_MESSAGE {
+			if skippedNewlineMessageIndex != lineIdx {
+				flushPendingContext()
+				newLines = append(newLines, line)
+			}
+			continue
+		}
+
+		isOldFileLine := (line.Kind == DELETION && !self.opts.Reverse) || (line.Kind == ADDITION && self.opts.Reverse)
+
+		if isLineSelected {
+			// Selected "old-file" lines must flush pending context first to preserve
+			// the correct ordering of old-file lines (deletions and context) relative
+			// to each other.
+			if isOldFileLine {
+				flushPendingContext()
+			}
+			newLines = append(newLines, line)
+			continue
+		}
+
+		if isOldFileLine {
 			content := " " + line.Content[1:]
-			newLines = append(newLines, &PatchLine{
+			pendingContext = append(pendingContext, &PatchLine{
 				Kind:    CONTEXT,
 				Content: content,
 			})
@@ -152,6 +185,8 @@ func (self *patchTransformer) transformHunkLines(hunk *Hunk, firstLineIdx int) [
 			skippedNewlineMessageIndex = lineIdx + 1
 		}
 	}
+
+	flushPendingContext()
 
 	return newLines
 }

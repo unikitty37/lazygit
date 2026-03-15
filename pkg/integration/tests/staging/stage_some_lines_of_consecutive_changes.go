@@ -49,7 +49,6 @@ var StageSomeLinesOfConsecutiveChanges = NewIntegrationTest(NewIntegrationTestAr
 
 		t.Views().StagingSecondary().
 			ContainsLines(
-				/* EXPECTED:
 				Contains(" 1"),
 				Contains("-2"),
 				Contains("-3"),
@@ -57,15 +56,6 @@ var StageSomeLinesOfConsecutiveChanges = NewIntegrationTest(NewIntegrationTestAr
 				Contains("+3b"),
 				Contains(" 4"),
 				Contains(" 5"),
-				Contains(" 6"),
-				ACTUAL: */
-				Contains(" 1"),
-				Contains("-2"),
-				Contains("-3"),
-				Contains(" 4"),
-				Contains(" 5"),
-				Contains("+2b"),
-				Contains("+3b"),
 				Contains(" 6"),
 			)
 	},
